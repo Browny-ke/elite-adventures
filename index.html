@@ -180,12 +180,14 @@
   </div>
 
   <script>
-    window.addEventListener("load", function () {
-      window.setTimeout(function () {
-        var splash = document.getElementById("startupScreen");
-        if (splash) splash.remove();
-      }, 2600);
-    });
+  window.addEventListener("load", function () {
+    window.setTimeout(function () {
+      var splash = document.getElementById("startupScreen");
+      if (splash) {
+        splash.style.display = "none";
+      }
+    }, 2600);
+  });
   </script>
 
   <script type="module" src="./src/main.jsx"></script>
