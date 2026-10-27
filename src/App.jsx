@@ -168,20 +168,31 @@ export default function App() {
     let active = true;
 
     async function initialise() {
-      const {
-        data: { session }
-      } = await supabase.auth.getSession();
+  try {
+    const { data, error } = await supabase.auth.getSession();
 
-      if (!active) return;
+    if (!active) return;
 
-      setUser(session?.user || null);
-      await loadPublicData();
+    if (error) {
+      console.error("Session loading error:", error);
+    }
 
-      if (session?.user) {
-        await checkAdmin(session.user);
-      }
+    const session = data?.session || null;
+    setUser(session?.user || null);
 
-      if (active) setLoading(false);
+    await loadPublicData();
+
+    if (active && session?.user) {
+      await checkAdmin(session.user);
+    }
+  } catch (error) {
+    console.error("App startup error:", error);
+    if (active) {
+      setNotice("Some information could not load. Please refresh and try again.");
+    }
+  } finally {
+    if (active) setLoading(false);
+  }
     }
 
     initialise();
