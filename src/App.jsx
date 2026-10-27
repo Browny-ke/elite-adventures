@@ -1816,7 +1816,7 @@ function PaymentInstructions({ trip, paymentName }) {
 
   return (
     <div className="ea-payment-instructions">
-      <strong>
+      <strong>Payment instructions</strong>
         <ol>
         {steps.map((step, index) => (
           <li key={index}>{step}</li>
