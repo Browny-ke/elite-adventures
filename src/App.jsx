@@ -168,29 +168,49 @@ export default function App() {
     let active = true;
 
     
-async function initialise() {
-  const {
-    data: { session }
-  } = await supabase.auth.getSession();
 
-  if (!active) return;
+    async function initialise() {
+      try {
+        const {
+          data: { session },
+          error
+        } = await supabase.auth.getSession();
 
-  setUser(session?.user || null);
-  await loadPublicData();
+        if (error) {
+          console.error("Session error:", error);
+        }
 
-  if (session?.user) {
-    await checkAdmin(session.user);
-  }
+        if (!active) return;
 
-  if (active) setLoading(false);
-}
-    
+        setUser(session?.user || null);
+
+        try {
+          await loadPublicData();
+        } catch (error) {
+          console.error("Public data error:", error);
+        }
+
+        if (session?.user) {
+          try {
+            await checkAdmin(session.user);
+          } catch (error) {
+            console.error("Admin check error:", error);
+          }
+        }
+      } catch (error) {
+        console.error("Initialisation error:", error);
+      } finally {
+        if (active) setLoading(false);
+      }
+    }
+
     initialise();
 
     const {
       data: { subscription }
     } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user || null);
+
       if (!session?.user) {
         setIsAdmin(false);
       } else {
@@ -203,6 +223,7 @@ async function initialise() {
       subscription.unsubscribe();
     };
   }, []);
+  
 
   async function loadPublicData() {
     if (!supabase) return;
