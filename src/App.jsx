@@ -804,7 +804,7 @@ async function initialise() {
         </section>
       </>
       );
-    }
+ }
 
   function renderTripDetails() {
     if (!selectedTrip) {
