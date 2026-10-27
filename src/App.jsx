@@ -1,994 +1,1874 @@
-
-import React, { useEffect, useState } from "react";
+  import React, { useEffect, useState } from "react";
 import { supabase } from "./supabase.js";
 import "./App.css";
+
+const BRAND = "ELITE ADVENTURES ®️";
+const SLOGAN = "Adventure Beyond Limits";
 
 const DEFAULT_SOCIALS = {
   facebook: "https://www.facebook.com/profile.php?id=61595176810539",
   tiktok: "https://vm.tiktok.com/ZS9yJYYksFK9P-UHc6F/",
-  instagram: "https://www.instagram.com/elite1_adventures/",
+  instagram:
+    "https://www.instagram.com/elite1_adventures?xtok=NzNyMHhrenFqbWtu",
   x: "https://x.com/elite_adv254",
-  youtube: "https://youtube.com/@elite-adventures"
+  youtube:
+    "https://youtube.com/@elite-adventures?si=oY-rxMpJipUjyKT_"
 };
+
+const SOCIALS = [
+  { key: "facebook", name: "Facebook", color: "#1877F2", icon: "f" },
+  { key: "tiktok", name: "TikTok", color: "#111111", icon: "♪" },
+  { key: "instagram", name: "Instagram", color: "#E1306C", icon: "◎" },
+  { key: "x", name: "X", color: "#111111", icon: "𝕏" },
+  { key: "youtube", name: "YouTube", color: "#FF0000", icon: "▶" }
+];
+
+const CATEGORIES = [
+  "Mountains",
+  "Beaches",
+  "Hiking",
+  "Camping",
+  "Water Sports",
+  "Wildlife",
+  "Other"
+];
+
+const TRIP_TAGS = ["New", "Hot", "Few Slots", "Sold Out"];
+
+const PAYMENT_METHODS = [
+  { value: "till", label: "Lipa na M-PESA Till" },
+  { value: "paybill", label: "Lipa na M-PESA Paybill" },
+  { value: "pochi", label: "Pochi la Biashara" }
+];
+
+const emptyTrip = {
+  title: "",
+  destination: "",
+  trip_date: "",
+  meeting_point: "",
+  meeting_time: "",
+  price: "",
+  activities: "",
+  description: "",
+  tag: "New",
+  poster_url: "",
+  cover_url: "",
+  destination_photos: [],
+  payment_method: "till",
+  payment_name: "",
+  till_number: "",
+  paybill_number: "",
+  account_number: "",
+  pochi_number: "",
+  payment_instructions: ""
+};
+
+function formatPrice(price) {
+  const value = Number(price);
+  return Number.isFinite(value)
+    ? `KSh ${value.toLocaleString("en-KE")}`
+    : "Price to be announced";
+}
+
+function SocialLinks({ links = DEFAULT_SOCIALS }) {
+  return (
+    <div className="ea-socials">
+      {SOCIALS.map((social) => (
+        <a
+          key={social.key}
+          className="ea-social"
+          href={links[social.key] || DEFAULT_SOCIALS[social.key]}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label={`Open ${social.name}`}
+        >
+          <span
+            className="ea-social-icon"
+            style={{ backgroundColor: social.color }}
+          >
+            {social.icon}
+          </span>
+          <span>{social.name}</span>
+        </a>
+      ))}
+    </div>
+  );
+}
+
+function SectionTitle({ eyebrow, title, children }) {
+  return (
+    <div className="ea-section-heading">
+      {eyebrow && <span className="ea-eyebrow">{eyebrow}</span>}
+      <h2>{title}</h2>
+      {children}
+    </div>
+  );
+}
+
+function EmptyState({ title, message }) {
+  return (
+    <div className="ea-empty">
+      <span aria-hidden="true">✦</span>
+      <h3>{title}</h3>
+      <p>{message}</p>
+    </div>
+  );
+}
 
 export default function App() {
   const [page, setPage] = useState("Home");
-  const [trips, setTrips] = useState([]);
-  const [gallery, setGallery] = useState([]);
-  const [announcements, setAnnouncements] = useState([]);
-  const [socials, setSocials] = useState(DEFAULT_SOCIALS);
-  const [chats, setChats] = useState([]);
-  const [anonymousMessage, setAnonymousMessage] = useState("");
-  const [loading, setLoading] = useState(true);
   const [user, setUser] = useState(null);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [notice, setNotice] = useState("");
-  const [authMode, setAuthMode] = useState("login");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [tripForm, setTripForm] = useState({
-    title: "",
-    location: "",
-    date: "",
-    price: "",
-    description: ""
-  });
+  const [trips, setTrips] = useState([]);
+  const [announcements, setAnnouncements] = useState([]);
+  const [gallery, setGallery] = useState([]);
+  const [socialLinks, setSocialLinks] = useState(DEFAULT_SOCIALS);
+  const [bookings, setBookings] = useState([]);
+  const [messages, setMessages] = useState([]);
+  const [tripSearch, setTripSearch] = useState("");
+  const [category, setCategory] = useState("All");
+  const [selectedTrip, setSelectedTrip] = useState(null);
+  const [tripForm, setTripForm] = useState(emptyTrip);
+  const [editingTrip, setEditingTrip] = useState(null);
   const [announcementForm, setAnnouncementForm] = useState({
     title: "",
-    message: ""
+    content: "",
+    image_url: ""
   });
-  const [chatMessage, setChatMessage] = useState("");
-  const [activeAdminTab, setActiveAdminTab] = useState("trips");
-
-  function notify(message) {
-    setNotice(message);
-    window.setTimeout(() => setNotice(""), 3000);
-  }
-
-  function showPage(nextPage) {
-    setPage(nextPage);
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  }
+  const [socialForm, setSocialForm] = useState(DEFAULT_SOCIALS);
+  const [authForm, setAuthForm] = useState({
+    email: "",
+    password: "",
+    phone: ""
+  });
+  const [authMode, setAuthMode] = useState("login");
+  const [bookingForm, setBookingForm] = useState({
+    full_name: "",
+    phone: "",
+    seats: 1
+  });
+  const [anonymousMessage, setAnonymousMessage] = useState("");
+  const [settings, setSettings] = useState({
+    fontSize: "14",
+    fontFamily: "system",
+    theme: "dark"
+  });
 
   useEffect(() => {
-    let active = true;
-
-    async function loadData() {
-      setLoading(true);
-
-      try {
-        const [tripResult, galleryResult, announcementResult, socialResult] =
-          await Promise.all([
-            supabase.from("trips").select("*").order("created_at", {
-              ascending: false
-            }),
-            supabase.from("gallery").select("*").order("created_at", {
-              ascending: false
-            }),
-            supabase.from("announcements").select("*").order("created_at", {
-              ascending: false
-            }),
-            supabase.from("social_links").select("*")
-          ]);
-
-        if (!active) return;
-
-        if (tripResult.data) setTrips(tripResult.data);
-        if (galleryResult.data) setGallery(galleryResult.data);
-        if (announcementResult.data) {
-          setAnnouncements(announcementResult.data);
-        }
-
-        if (socialResult.data?.length) {
-          const updatedSocials = { ...DEFAULT_SOCIALS };
-
-          socialResult.data.forEach((item) => {
-            if (item.platform in updatedSocials) {
-              updatedSocials[item.platform] = item.url;
-            }
-          });
-
-          setSocials(updatedSocials);
-        }
-      } catch (error) {
-        notify("Unable to load some content.");
-      } finally {
-        if (active) setLoading(false);
-      }
+    if (!supabase) {
+      setNotice(
+        "Supabase configuration is missing. Check your GitHub Actions secrets and rebuild."
+      );
+      setLoading(false);
+      return;
     }
 
-    loadData();
+    let active = true;
 
-    return () => {
-      active = false;
-    };
-  }, []);
+    async function initialise() {
+      const {
+        data: { session }
+      } = await supabase.auth.getSession();
 
-  useEffect(() => {
+      if (!active) return;
+
+      setUser(session?.user || null);
+      await loadPublicData();
+
+      if (session?.user) {
+        await checkAdmin(session.user);
+      }
+
+      if (active) setLoading(false);
+    }
+
+    initialise();
+
     const {
       data: { subscription }
     } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
+      setUser(session?.user || null);
+      if (!session?.user) {
+        setIsAdmin(false);
+      } else {
+        setTimeout(() => checkAdmin(session.user), 0);
+      }
     });
 
-    supabase.auth.getSession().then(({ data }) => {
-      setUser(data.session?.user ?? null);
-    });
-
-    return () => subscription.unsubscribe();
+    return () => {
+      active = false;
+      subscription.unsubscribe();
+    };
   }, []);
-  
-  async function signUp() {
-    if (!email.trim() || !password) {
-      notify("Enter your email and password.");
-      return;
-    }
 
-    const { error } = await supabase.auth.signUp({
-      email: email.trim(),
-      password
-    });
+  async function loadPublicData() {
+    if (!supabase) return;
 
-    if (error) {
-      notify(error.message);
-    } else {
-      notify("Account created. Check your email if confirmation is required.");
-      setAuthMode("login");
+    const results = await Promise.all([
+      supabase.from("trips").select("*").order("trip_date", {
+        ascending: true
+      }),
+      supabase
+        .from("announcements")
+        .select("*")
+        .order("created_at", { ascending: false }),
+      supabase
+        .from("gallery")
+        .select("*")
+        .order("created_at", { ascending: false }),
+      supabase.from("site_settings").select("*")
+    ]);
+
+    const [tripResult, announcementResult, galleryResult, settingsResult] =
+      results;
+
+    if (!tripResult.error) setTrips(tripResult.data || []);
+    if (!announcementResult.error)
+      setAnnouncements(announcementResult.data || []);
+    if (!galleryResult.error) setGallery(galleryResult.data || []);
+
+    if (!settingsResult.error && settingsResult.data) {
+      const socialRow = settingsResult.data.find(
+        (item) => item.key === "social_links"
+      );
+      if (socialRow?.value) {
+        setSocialLinks({ ...DEFAULT_SOCIALS, ...socialRow.value });
+        setSocialForm({ ...DEFAULT_SOCIALS, ...socialRow.value });
+      }
     }
   }
 
-  async function signIn() {
-    if (!email.trim() || !password) {
-      notify("Enter your email and password.");
-      return;
-    }
-
-    const { error } = await supabase.auth.signInWithPassword({
-      email: email.trim(),
-      password
-    });
-
-    if (error) {
-      notify(error.message);
-    } else {
-      notify("Signed in successfully.");
-    }
-  }
-
-  async function signOut() {
-    const { error } = await supabase.auth.signOut();
-
-    if (error) {
-      notify(error.message);
-      return;
-    }
-
-    setIsAdmin(false);
-    notify("You have signed out.");
-    showPage("Home");
-  }
-
-  async function checkAdmin() {
-    if (!user) {
-      notify("Please sign in first.");
-      return false;
-    }
+  async function checkAdmin(currentUser) {
+    if (!supabase || !currentUser) return;
 
     const { data, error } = await supabase
       .from("user_roles")
       .select("role")
-      .eq("user_id", user.id)
+      .eq("user_id", currentUser.id)
       .maybeSingle();
 
-    if (error) {
-      notify("Could not verify administrator access.");
-      return false;
-    }
-
-    const allowed = data?.role === "admin";
-    setIsAdmin(allowed);
-
-    if (!allowed) {
-      notify("Administrator access only.");
-      return false;
-    }
-
-    return true;
+    setIsAdmin(!error && data?.role === "admin");
   }
 
-  async function sendChatMessage(event) {
+  async function signIn(event) {
     event.preventDefault();
+    setNotice("");
 
-    if (!user) {
-      notify("Sign in to use the chat.");
+    if (!supabase) {
+      setNotice("Supabase is not configured.");
       return;
     }
 
-    if (!chatMessage.trim()) {
-      notify("Type a message first.");
-      return;
-    }
-
-    const { error } = await supabase.from("chat_messages").insert({
-      user_id: user.id,
-      message: chatMessage.trim()
+    const { error } = await supabase.auth.signInWithPassword({
+      email: authForm.email.trim(),
+      password: authForm.password
     });
 
     if (error) {
-      notify("Message could not be sent.");
+      setNotice(error.message);
       return;
     }
 
-    setChats((previous) => [
-      ...previous,
-      {
-        user_id: user.id,
-        message: chatMessage.trim(),
-        created_at: new Date().toISOString()
-      }
-    ]);
+    setNotice("Signed in successfully.");
+    setPage("Home");
+  }
 
-    setChatMessage("");
-    notify("Message sent.");
+  async function signUp(event) {
+    event.preventDefault();
+    setNotice("");
+
+    if (!supabase) {
+      setNotice("Supabase is not configured.");
+      return;
+    }
+
+    const { error } = await supabase.auth.signUp({
+      email: authForm.email.trim(),
+      password: authForm.password
+    });
+
+    setNotice(
+      error
+        ? error.message
+        : "Registration submitted. Check your email if confirmation is enabled."
+    );
+  }
+
+  async function signInWithGoogle() {
+    if (!supabase) return setNotice("Supabase is not configured.");
+
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo: window.location.origin + window.location.pathname
+      }
+    });
+
+    if (error) setNotice(error.message);
+  }
+
+  async function requestPhoneLogin() {
+    if (!supabase) return setNotice("Supabase is not configured.");
+
+    const phone = authForm.phone.trim();
+    if (!phone) return setNotice("Enter your phone number.");
+
+    const { error } = await supabase.auth.signInWithOtp({ phone });
+    setNotice(
+      error
+        ? error.message
+        : "A verification code has been requested. Follow the SMS instructions."
+    );
+  }
+
+  async function signOut() {
+    if (!supabase) return;
+
+    const { error } = await supabase.auth.signOut();
+    if (error) return setNotice(error.message);
+
+    setIsAdmin(false);
+    setPage("Home");
+    setNotice("You have signed out.");
+  }
+
+  async function saveTrip(event) {
+    event.preventDefault();
+
+    if (!supabase || !isAdmin) {
+      return setNotice("Only an authenticated admin can manage trips.");
+    }
+
+    const payload = {
+      title: tripForm.title.trim(),
+      destination: tripForm.destination.trim(),
+      trip_date: tripForm.trip_date || null,
+      meeting_point: tripForm.meeting_point.trim(),
+      meeting_time: tripForm.meeting_time.trim(),
+      price: Number(tripForm.price),
+      activities: tripForm.activities.trim(),
+      description: tripForm.description.trim(),
+      tag: tripForm.tag,
+      poster_url: tripForm.poster_url.trim(),
+      cover_url: tripForm.cover_url.trim(),
+      payment_method: tripForm.payment_method,
+      payment_name: tripForm.payment_name.trim(),
+      till_number: tripForm.till_number.trim(),
+      paybill_number: tripForm.paybill_number.trim(),
+      account_number: tripForm.account_number.trim(),
+      pochi_number: tripForm.pochi_number.trim(),
+      payment_instructions: tripForm.payment_instructions.trim()
+    };
+
+    const query = editingTrip
+      ? supabase.from("trips").update(payload).eq("id", editingTrip)
+      : supabase.from("trips").insert(payload);
+
+    const { error } = await query;
+
+    if (error) return setNotice(error.message);
+
+    setNotice("Trip saved.");
+    setTripForm(emptyTrip);
+    setEditingTrip(null);
+    await loadPublicData();
+  }
+
+  async function deleteTrip(id) {
+    if (!supabase || !isAdmin) return;
+
+    if (!window.confirm("Delete this trip? This cannot be undone.")) return;
+
+    const { error } = await supabase.from("trips").delete().eq("id", id);
+
+    if (error) return setNotice(error.message);
+
+    setNotice("Trip deleted.");
+    await loadPublicData();
+  }
+
+  function editTrip(trip) {
+    setTripForm({ ...emptyTrip, ...trip });
+    setEditingTrip(trip.id);
+    setPage("Admin");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  async function saveAnnouncement(event) {
+    event.preventDefault();
+
+    if (!supabase || !isAdmin) {
+      return setNotice("Only an authenticated admin can post announcements.");
+    }
+
+    const { error } = await supabase.from("announcements").insert({
+      title: announcementForm.title.trim(),
+      content: announcementForm.content.trim(),
+      image_url: announcementForm.image_url.trim(),
+      created_by: user.id
+    });
+
+    if (error) return setNotice(error.message);
+
+    setAnnouncementForm({ title: "", content: "", image_url: "" });
+    setNotice("Announcement published.");
+    await loadPublicData();
+  }
+
+  async function deleteAnnouncement(id) {
+    if (!supabase || !isAdmin) return;
+
+    const { error } = await supabase
+      .from("announcements")
+      .delete()
+      .eq("id", id);
+
+    if (error) return setNotice(error.message);
+
+    setNotice("Announcement deleted.");
+    await loadPublicData();
+  }
+
+  async function saveSocialLinks(event) {
+    event.preventDefault();
+
+    if (!supabase || !isAdmin) {
+      return setNotice("Only an admin can edit social links.");
+    }
+
+    const { error } = await supabase.from("site_settings").upsert(
+      {
+        key: "social_links",
+        value: socialForm,
+        updated_by: user.id,
+        updated_at: new Date().toISOString()
+      },
+      { onConflict: "key" }
+    );
+
+    if (error) return setNotice(error.message);
+
+    setSocialLinks({ ...socialForm });
+    setNotice("Social links updated.");
+  }
+
+  async function uploadFile(file, bucket = "elite-media") {
+    if (!supabase || !file) return null;
+
+    const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "-");
+    const path = `${Date.now()}-${safeName}`;
+
+    const { error } = await supabase.storage
+      .from(bucket)
+      .upload(path, file, { upsert: false });
+
+    if (error) {
+      setNotice(error.message);
+      return null;
+    }
+
+    const { data } = supabase.storage.from(bucket).getPublicUrl(path);
+    return data.publicUrl;
+  }
+
+  async function handleTripImage(event, field) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const url = await uploadFile(file);
+    if (url) {
+      setTripForm((previous) => ({ ...previous, [field]: url }));
+      setNotice("Image uploaded.");
+    }
+  }
+
+  async function publishGalleryFile(event) {
+    const file = event.target.files?.[0];
+    if (!file || !supabase) return;
+
+    const url = await uploadFile(file);
+    if (!url) return;
+
+    const isVideo = file.type.startsWith("video/");
+    const { error } = await supabase.from("gallery").insert({
+      title: file.name,
+      media_url: url,
+      media_type: isVideo ? "video" : "image",
+      uploaded_by: user?.id || null
+    });
+
+    if (error) return setNotice(error.message);
+
+    setNotice("Gallery item uploaded.");
+    await loadPublicData();
+  }
+
+  async function deleteGalleryItem(id) {
+    if (!supabase || !isAdmin) return;
+
+    const { error } = await supabase.from("gallery").delete().eq("id", id);
+    if (error) return setNotice(error.message);
+
+    setNotice("Gallery item deleted.");
+    await loadPublicData();
+  }
+
+  async function submitBooking(event) {
+    event.preventDefault();
+
+    if (!supabase) return setNotice("Supabase is not configured.");
+    if (!selectedTrip) return setNotice("Choose a trip first.");
+
+    const { error } = await supabase.from("bookings").insert({
+      trip_id: selectedTrip.id,
+      user_id: user?.id || null,
+      full_name: bookingForm.full_name.trim(),
+      phone: bookingForm.phone.trim(),
+      seats: Math.max(1, Number(bookingForm.seats) || 1),
+      status: "pending"
+    });
+
+    if (error) return setNotice(error.message);
+
+    setNotice("Booking request submitted. Follow the payment instructions below.");
+    setPage("Bookings");
   }
 
   async function sendAnonymousMessage(event) {
     event.preventDefault();
 
-    if (anonymousMessage.trim().length < 2) {
-      notify("Please enter at least 2 characters.");
-      return;
+    if (!supabase) return setNotice("Supabase is not configured.");
+
+    const message = anonymousMessage.trim();
+    if (message.length < 2 || message.length > 2000) {
+      return setNotice("Message must be between 2 and 2000 characters.");
     }
 
-    const { error } = await supabase
-      .from("anonymous_messages")
-      .insert({
-        message: anonymousMessage.trim()
-      });
+    const { error } = await supabase.from("anonymous_messages").insert({
+      message,
+      status: "unread"
+    });
 
-    if (error) {
-      notify("Message could not be sent. Please try again.");
-      return;
-    }
+    if (error) return setNotice(error.message);
 
     setAnonymousMessage("");
-    notify("Your message was submitted anonymously.");
+    setNotice("Your anonymous message was submitted.");
   }
-  
-  async function saveTrip(event) {
-    event.preventDefault();
 
-    if (!(await checkAdmin())) return;
+  async function loadAdminData() {
+    if (!supabase || !isAdmin) return;
 
-    if (
-      !tripForm.title.trim() ||
-      !tripForm.location.trim() ||
-      !tripForm.date ||
-      tripForm.price === ""
-    ) {
-      notify("Complete all required trip fields.");
-      return;
-    }
-
-    const { data, error } = await supabase
-      .from("trips")
-      .insert({
-        title: tripForm.title.trim(),
-        location: tripForm.location.trim(),
-        date: tripForm.date,
-        price: Number(tripForm.price),
-        description: tripForm.description.trim()
+    const [bookingResult, messageResult] = await Promise.all([
+      supabase.from("bookings").select("*").order("created_at", {
+        ascending: false
+      }),
+      supabase.from("anonymous_messages").select("*").order("created_at", {
+        ascending: false
       })
-      .select()
-      .single();
+    ]);
 
-    if (error) {
-      notify("Could not save trip: " + error.message);
-      return;
-    }
-
-    setTrips((previous) => [data, ...previous]);
-
-    setTripForm({
-      title: "",
-      location: "",
-      date: "",
-      price: "",
-      description: ""
-    });
-
-    notify("Trip published successfully.");
+    if (!bookingResult.error) setBookings(bookingResult.data || []);
+    if (!messageResult.error) setMessages(messageResult.data || []);
   }
 
-  async function publishAnnouncement(event) {
-    event.preventDefault();
+  useEffect(() => {
+    if (page === "Admin" && isAdmin) loadAdminData();
+  }, [page, isAdmin]);
 
-    if (!(await checkAdmin())) return;
+  const filteredTrips = trips.filter((trip) => {
+    const matchesSearch = [
+      trip.title,
+      trip.destination,
+      trip.description
+    ]
+      .filter(Boolean)
+      .join(" ")
+      .toLowerCase()
+      .includes(tripSearch.toLowerCase());
 
-    if (
-      !announcementForm.title.trim() ||
-      !announcementForm.message.trim()
-    ) {
-      notify("Enter the announcement title and message.");
-      return;
-    }
+    const matchesCategory =
+      category === "All" || trip.category === category;
 
-    const { data, error } = await supabase
-      .from("announcements")
-      .insert({
-        title: announcementForm.title.trim(),
-        message: announcementForm.message.trim()
-      })
-      .select()
-      .single();
+    return matchesSearch && matchesCategory;
+  });
 
-    if (error) {
-      notify("Could not publish announcement: " + error.message);
-      return;
-    }
-
-    setAnnouncements((previous) => [data, ...previous]);
-
-    setAnnouncementForm({
-      title: "",
-      message: ""
-    });
-
-    notify("Announcement published.");
-  }
-
-  async function uploadGalleryImage(event) {
-    const file = event.target.files?.[0];
-
-    if (!file) return;
-    if (!(await checkAdmin())) {
-      event.target.value = "";
-      return;
-    }
-
-    if (!file.type.startsWith("image/")) {
-      notify("Please select an image file.");
-      event.target.value = "";
-      return;
-    }
-
-    const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
-    const filePath = `${Date.now()}-${safeName}`;
-
-    const { error: uploadError } = await supabase.storage
-      .from("elite-media")
-      .upload(filePath, file);
-
-    if (uploadError) {
-      notify("Image upload failed: " + uploadError.message);
-      event.target.value = "";
-      return;
-    }
-
-    const { data: urlData } = supabase.storage
-      .from("elite-media")
-      .getPublicUrl(filePath);
-
-    const { data, error } = await supabase
-      .from("gallery")
-      .insert({
-        image_url: urlData.publicUrl,
-        file_path: filePath,
-        uploaded_by: user.id
-      })
-      .select()
-      .single();
-
-    if (error) {
-      notify("Image uploaded, but saving its details failed.");
-      event.target.value = "";
-      return;
-    }
-
-    setGallery((previous) => [data, ...previous]);
-    notify("Gallery image added.");
-    event.target.value = "";
-  }
-    
-  return (
-    <div className="app-shell">
-      <header className="top-header">
-        <a
-          className="brand"
-          href="#home"
-          onClick={(event) => {
-            event.preventDefault();
-            showPage("Home");
-          }}
+  function renderHeader() {
+    return (
+      <header className="ea-header">
+        <button
+          className="ea-brand"
+          onClick={() => setPage("Home")}
+          aria-label="Elite Adventures home"
         >
-          <img
-            src="/assets/elite-adventures-logo.png"
-            alt="Elite Adventures logo"
-            className="brand-logo"
-            onError={(event) => {
-              event.currentTarget.style.display = "none";
-            }}
-          />
-          <span>ELITE <strong>ADVENTURES</strong></span>
-        </a>
+          <span className="ea-brand-mark">EA</span>
+          <span>
+            <strong>ELITE ADVENTURES</strong>
+            <em>{SLOGAN}</em>
+          </span>
+        </button>
 
-        <div className="header-actions">
-          {user ? (
-            <button className="small-button" onClick={signOut}>
-              Sign out
-            </button>
-          ) : (
-            <button
-              className="small-button"
-              onClick={() => showPage("Profile")}
-            >
-              Sign in
-            </button>
-          )}
-        </div>
+        <button
+          className="ea-menu-button"
+          onClick={() => setPage(page === "Menu" ? "Home" : "Menu")}
+          aria-label="Open menu"
+        >
+          ☰
+        </button>
       </header>
+    );
+  }
 
-      <main className="main-content">
-        {notice && (
-          <div className="notice" role="status">
-            {notice}
-          </div>
-        )}
+  function renderNavigation() {
+    const links = [
+      ["Home", "⌂"],
+      ["Explore", "⌕"],
+      ["Bookings", "▣"],
+      ["Gallery", "▧"],
+      ["Profile", "♙"]
+    ];
 
-        {loading ? (
-          <section className="loading-panel">
-            <div className="loader" />
-            <p>Loading your adventures...</p>
-          </section>
-        ) : (
-          <>
-            {page === "Home" && (
-              <section className="hero-section">
-                <p className="eyebrow">EXPLORE • DISCOVER • CONNECT</p>
-                <h1>
-                  Your next
-                  <span> adventure</span>
-                  starts here.
-                </h1>
-                <p className="hero-description">
-                  Discover amazing destinations, join exciting trips,
-                  meet new people, and create unforgettable memories
-                  with Elite Adventures.
-                </p>
-
-                <div className="hero-actions">
-                  <button
-                    className="primary-button"
-                    onClick={() => showPage("Explore")}
-                  >
-                    Explore trips
-                  </button>
-                  <button
-                    className="secondary-button"
-                    onClick={() => showPage("Gallery")}
-                  >
-                    View gallery
-                  </button>
-                </div>
-
-                <div className="stats-row">
-                  <div>
-                    <strong>{trips.length}</strong>
-                    <span>Listed trips</span>
-                  </div>
-                  <div>
-                    <strong>{gallery.length}</strong>
-                    <span>Gallery photos</span>
-                  </div>
-                  <div>
-                    <strong>{announcements.length}</strong>
-                    <span>Updates</span>
-                  </div>
-                </div>
-
-                <section className="content-section">
-                  <div className="section-heading">
-                    <div>
-                      <p className="eyebrow">STAY IN THE LOOP</p>
-                      <h2>Latest announcements</h2>
-                    </div>
-                  </div>
-
-                  {announcements.length ? (
-                    announcements.map((item) => (
-                      <article className="announcement-card" key={item.id}>
-                        <h3>{item.title}</h3>
-                        <p>{item.message}</p>
-                      </article>
-                    ))
-                  ) : (
-                    <p className="empty-state">
-                      No announcements yet. Check back for updates.
-                    </p>
-                  )}
-                </section>
-
-                <section className="content-section">
-                  <div className="section-heading">
-                    <div>
-                      <p className="eyebrow">YOUR NEXT ESCAPE</p>
-                      <h2>Featured adventures</h2>
-                    </div>
-                    <button
-                      className="text-button"
-                      onClick={() => showPage("Explore")}
-                    >
-                      See all
-                    </button>
-                  </div>
-
-                  <TripCards
-                    trips={trips.slice(0, 3)}
-                    onBook={() => showPage("Bookings")}
-                  />
-                </section>
-              </section>
-            )}
-
-            {page === "Explore" && (
-              <section className="page-section">
-                <p className="eyebrow">FIND YOUR NEXT ESCAPE</p>
-                <h1>Explore trips</h1>
-                <p className="muted">
-                  Find an adventure that matches your vibe.
-                </p>
-                <TripCards
-                  trips={trips}
-                  onBook={() => showPage("Bookings")}
-                />
-              </section>
-            )}
-
-            {page === "Bookings" && (
-              <section className="page-section">
-                <p className="eyebrow">MAKE IT HAPPEN</p>
-                <h1>Bookings</h1>
-                <div className="info-card">
-                  <h3>Ready for your next adventure?</h3>
-                  <p>
-                    Choose a trip from Explore and contact the
-                    organizer to confirm availability, payment
-                    details, and your booking.
-                  </p>
-                  <button
-                    className="primary-button"
-                    onClick={() => showPage("Explore")}
-                  >
-                    Browse trips
-                  </button>
-                </div>
-              </section>
-            )}
-          </>
-        )}
-      </main>
-                  
-            {page === "Chats" && (
-              <section className="page-section">
-                <p className="eyebrow">CONNECT WITH THE COMMUNITY</p>
-                <h1>Community chat</h1>
-
-                {!user ? (
-                  <div className="info-card">
-                    <p>Sign in to join the community chat.</p>
-                    <button
-                      className="primary-button"
-                      onClick={() => showPage("Profile")}
-                    >
-                      Sign in
-                    </button>
-                  </div>
-                ) : (
-                  <form className="form-card" onSubmit={sendChatMessage}>
-                    <label htmlFor="chatMessage">Your message</label>
-                    <textarea
-                      id="chatMessage"
-                      value={chatMessage}
-                      onChange={(event) => setChatMessage(event.target.value)}
-                      placeholder="Write something..."
-                      maxLength={2000}
-                      required
-                    />
-                    <button className="primary-button" type="submit">
-                      Send message
-                    </button>
-                    <p className="muted">
-                      Community messages are stored in the chat database.
-                    </p>
-                  </form>
-                )}
-
-                <div className="info-card">
-                  <h3>Say something without fear</h3>
-                  <p>Your message is securely submitted anonymously.</p>
-                  <form onSubmit={sendAnonymousMessage}>
-                    <textarea
-                      value={anonymousMessage}
-                      onChange={(event) =>
-                        setAnonymousMessage(event.target.value)
-                      }
-                      placeholder="Write an anonymous message..."
-                      minLength={2}
-                      maxLength={2000}
-                      required
-                    />
-                    <button className="primary-button" type="submit">
-                      Send anonymously
-                    </button>
-                  </form>
-                </div>
-              </section>
-            )}
-
-            {page === "Gallery" && (
-              <section className="page-section">
-                <p className="eyebrow">MOMENTS THAT MATTER</p>
-                <h1>Our gallery</h1>
-
-                {isAdmin && (
-                  <label className="upload-button">
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={uploadGalleryImage}
-                    />
-                    <span>＋ Add photo</span>
-                  </label>
-                )}
-
-                <GalleryGrid gallery={gallery} />
-              </section>
-            )}
-
-            {page === "Profile" && (
-              <section className="page-section">
-                <p className="eyebrow">YOUR ACCOUNT</p>
-                <h1>Profile</h1>
-
-                {user ? (
-                  <div className="info-card">
-                    <h3>Welcome back!</h3>
-                    <p>{user.email}</p>
-
-                    <button
-                      className="secondary-button"
-                      onClick={async () => {
-                        const allowed = await checkAdmin();
-                        if (allowed) showPage("Admin");
-                      }}
-                    >
-                      Open admin panel
-                    </button>
-
-                    <button className="primary-button" onClick={signOut}>
-                      Sign out
-                    </button>
-                  </div>
-                ) : (
-                  <form
-                    className="form-card"
-                    onSubmit={(event) => {
-                      event.preventDefault();
-                      authMode === "login" ? signIn() : signUp();
-                    }}
-                  >
-                    <div className="form-tabs">
-                      <button
-                        type="button"
-                        className={authMode === "login" ? "active" : ""}
-                        onClick={() => setAuthMode("login")}
-                      >
-                        Sign in
-                      </button>
-                      <button
-                        type="button"
-                        className={authMode === "signup" ? "active" : ""}
-                        onClick={() => setAuthMode("signup")}
-                      >
-                        Create account
-                      </button>
-                    </div>
-
-                    <label htmlFor="email">Email address</label>
-                    <input
-                      id="email"
-                      type="email"
-                      value={email}
-                      onChange={(event) => setEmail(event.target.value)}
-                      required
-                    />
-
-                    <label htmlFor="password">Password</label>
-                    <input
-                      id="password"
-                      type="password"
-                      value={password}
-                      onChange={(event) => setPassword(event.target.value)}
-                      minLength={6}
-                      required
-                    />
-
-                    <button className="primary-button" type="submit">
-                      {authMode === "login" ? "Sign in" : "Create account"}
-                    </button>
-                  </form>
-                )}
-              </section>
-            )}
-
-            {page === "Admin" && (
-              <section className="page-section">
-                <p className="eyebrow">MANAGEMENT</p>
-                <h1>Admin panel</h1>
-
-                {!user ? (
-                  <div className="info-card">
-                    <p>Sign in with an authorized administrator account.</p>
-                    <button
-                      className="primary-button"
-                      onClick={() => showPage("Profile")}
-                    >
-                      Sign in
-                    </button>
-                  </div>
-                ) : (
-                  <div className="admin-panel">
-                    <div className="form-tabs">
-                      <button
-                        type="button"
-                        onClick={() => setActiveAdminTab("trips")}
-                        className={activeAdminTab === "trips" ? "active" : ""}
-                      >
-                        Add trip
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setActiveAdminTab("announcements")}
-                        className={
-                          activeAdminTab === "announcements" ? "active" : ""
-                        }
-                      >
-                        Announcement
-                      </button>
-                    </div>
-
-                    {activeAdminTab === "trips" && (
-                      <form className="form-card" onSubmit={saveTrip}>
-                        <label htmlFor="tripTitle">Trip title</label>
-                        <input
-                          id="tripTitle"
-                          value={tripForm.title}
-                          onChange={(event) =>
-                            setTripForm({
-                              ...tripForm,
-                              title: event.target.value
-                            })
-                          }
-                          required
-                        />
-
-                        <label htmlFor="tripLocation">Destination</label>
-                        <input
-                          id="tripLocation"
-                          value={tripForm.location}
-                          onChange={(event) =>
-                            setTripForm({
-                              ...tripForm,
-                              location: event.target.value
-                            })
-                          }
-                          required
-                        />
-
-                        <label htmlFor="tripDate">Trip date</label>
-                        <input
-                          id="tripDate"
-                          type="date"
-                          value={tripForm.date}
-                          onChange={(event) =>
-                            setTripForm({
-                              ...tripForm,
-                              date: event.target.value
-                            })
-                          }
-                          required
-                        />
-
-                        <label htmlFor="tripPrice">Price (KSh)</label>
-                        <input
-                          id="tripPrice"
-                          type="number"
-                          min="0"
-                          value={tripForm.price}
-                          onChange={(event) =>
-                            setTripForm({
-                              ...tripForm,
-                              price: event.target.value
-                            })
-                          }
-                          required
-                        />
-
-                        <label htmlFor="tripDescription">Description</label>
-                        <textarea
-                          id="tripDescription"
-                          value={tripForm.description}
-                          onChange={(event) =>
-                            setTripForm({
-                              ...tripForm,
-                              description: event.target.value
-                            })
-                          }
-                        />
-
-                        <button className="primary-button" type="submit">
-                          Publish trip
-                        </button>
-                      </form>
-                    )}
-
-                    {activeAdminTab === "announcements" && (
-                      <form
-                        className="form-card"
-                        onSubmit={publishAnnouncement}
-                      >
-                        <label htmlFor="announcementTitle">Title</label>
-                        <input
-                          id="announcementTitle"
-                          value={announcementForm.title}
-                          onChange={(event) =>
-                            setAnnouncementForm({
-                              ...announcementForm,
-                              title: event.target.value
-                            })
-                          }
-                          required
-                        />
-
-                        <label htmlFor="announcementMessage">Message</label>
-                        <textarea
-                          id="announcementMessage"
-                          value={announcementForm.message}
-                          onChange={(event) =>
-                            setAnnouncementForm({
-                              ...announcementForm,
-                              message: event.target.value
-                            })
-                          }
-                          required
-                        />
-
-                        <button className="primary-button" type="submit">
-                          Publish announcement
-                        </button>
-                      </form>
-                    )}
-                  </div>
-                )}
-              </section>
-            )}
-
-            <section className="social-section">
-              <h2>Follow Elite Adventures</h2>
-              <SocialLinks socials={socials} />
-            </section>
-          </>
-        )}
-      </main>
-
-      <nav className="bottom-nav">
-        {[
-          ["Home", "⌂"],
-          ["Explore", "⌕"],
-          ["Bookings", "▣"],
-          ["Chats", "✉"],
-          ["Gallery", "▧"],
-          ["Profile", "◎"]
-        ].map(([name, symbol]) => (
+    return (
+      <nav className="ea-bottom-nav" aria-label="Main navigation">
+        {links.map(([label, icon]) => (
           <button
-            key={name}
-            type="button"
-            className={page === name ? "nav-item active" : "nav-item"}
-            onClick={() => showPage(name)}
+            key={label}
+            className={page === label ? "active" : ""}
+            onClick={() => setPage(label)}
           >
-            <span className="nav-symbol">{symbol}</span>
-            <span>{name}</span>
+            <span>{icon}</span>
+            <small>{label}</small>
           </button>
         ))}
       </nav>
-    </div>
-  );
-}
-
-function TripCards({ trips, onBook }) {
-  if (!trips.length) {
-    return <p className="empty-state">New adventures will appear here soon.</p>;
+    );
   }
 
-  return (
-    <div className="trip-grid">
-      {trips.map((trip) => (
-        <article className="trip-card" key={trip.id}>
-          <div className="trip-card-art">✦</div>
-          <div className="trip-card-content">
-            <h3>{trip.title}</h3>
-            <p className="muted">{trip.location}</p>
-            {trip.date && (
-              <p className="trip-date">
-                {new Date(`${trip.date}T00:00:00`).toLocaleDateString()}
-              </p>
-            )}
-            {trip.description && <p>{trip.description}</p>}
-            <div className="trip-card-footer">
-              <strong>KSh {Number(trip.price || 0).toLocaleString()}</strong>
-              <button
-                className="small-button"
-                onClick={onBook}
-                type="button"
+  function renderMenu() {
+    const links = [
+      "Home",
+      "Explore",
+      "Bookings",
+      "Group Chat",
+      "Private Chat",
+      "Chat Admin",
+      "Gallery",
+      "Social Links",
+      "Anonymous Chat",
+      "Announcements",
+      "About",
+      "Profile",
+      "Settings",
+      ...(isAdmin ? ["Admin"] : [])
+    ];
+
+    return (
+      <section className="ea-menu-panel">
+        <div className="ea-menu-brand">
+          <span className="ea-brand-mark">EA</span>
+          <div>
+            <strong>ELITE ADVENTURES</strong>
+            <em>{SLOGAN}</em>
+          </div>
+        </div>
+
+        {user && (
+          <p className="ea-muted">
+            Signed in as {user.email || user.phone || "Member"}
+          </p>
+        )}
+
+        {links.map((link) => (
+          <button
+            key={link}
+            className="ea-menu-link"
+            onClick={() => setPage(link)}
+          >
+            {link}
+            <span>›</span>
+          </button>
+        ))}
+
+        {user && (
+          <button className="ea-button ea-button-outline" onClick={signOut}>
+            Log out
+          </button>
+        )}
+      </section>
+    );
+  }
+
+  function renderHome() {
+    return (
+      <>
+        <section className="ea-hero">
+          <div className="ea-hero-overlay">
+            <span className="ea-eyebrow">YOUR NEXT STORY STARTS HERE</span>
+            <h1>
+              Adventure
+              <br />
+              <span>Awaits!</span>
+            </h1>
+            <p>Explore. Connect. Travel Together.</p>
+            <em className="ea-slogan">{SLOGAN}</em>
+
+            <button
+              className="ea-button ea-button-primary"
+              onClick={() => setPage("Explore")}
+            >
+              Explore trips <span>→</span>
+            </button>
+          </div>
+        </section>
+
+        <section className="ea-page-section">
+          <SectionTitle eyebrow="WHAT'S HAPPENING" title="Latest announcements" />
+          {announcements.length ? (
+            <div className="ea-announcement-list">
+              {announcements.slice(0, 4).map((item) => (
+                <article className="ea-announcement" key={item.id}>
+                  {item.image_url && (
+                    <img src={item.image_url} alt="" loading="lazy" />
+                  )}
+                  <div>
+                    <h3>{item.title}</h3>
+                    <p>{item.content}</p>
+                  </div>
+                </article>
+              ))}
+            </div>
+          ) : (
+            <EmptyState
+              title="Stay tuned"
+              message="New trip announcements will appear here."
+            />
+          )}
+        </section>
+
+        <section className="ea-page-section">
+          <SectionTitle
+            eyebrow="PLAN YOUR ESCAPE"
+            title="Upcoming trips"
+          >
+                <button className="ea-text-button" onClick={() => setPage("Explore")}>
+              See all →
+            </button>
+          </SectionTitle>
+
+          {trips.length ? (
+            <div className="ea-trip-grid">
+              {trips.slice(0, 4).map((trip) => (
+                <TripCard
+                  key={trip.id}
+                  trip={trip}
+                  onOpen={() => {
+                    setSelectedTrip(trip);
+                    setPage("Trip Details");
+                  }}
+                />
+              ))}
+            </div>
+          ) : (
+            <EmptyState
+              title="New adventures are coming"
+              message="Published trips will appear here."
+            />
+          )}
+        </section>
+
+        <section className="ea-page-section">
+          <SectionTitle eyebrow="STAY CONNECTED" title="Join the community" />
+          <SocialLinks links={socialLinks} />
+          <div className="ea-feature-grid">
+            <FeatureCard
+              icon="✦"
+              title="Group Chat"
+              text="Connect with fellow travellers."
+              onClick={() => setPage("Group Chat")}
+            />
+            <FeatureCard
+              icon="◉"
+              title="Private Chat"
+              text="Continue conversations privately."
+              onClick={() => setPage("Private Chat")}
+            />
+            <FeatureCard
+              icon="✉"
+              title="Anonymous Chat"
+              text="Share your thoughts privately."
+              onClick={() => setPage("Anonymous Chat")}
+            />
+          </div>
+        </section>
+      </>
+      );
+  }
+
+  function renderTripDetails() {
+    if (!selectedTrip) {
+      return (
+        <EmptyState
+          title="Choose an adventure"
+          message="Select a trip from Explore to see its details."
+        />
+      );
+    }
+
+    const trip = selectedTrip;
+    const paymentName = trip.payment_name || "Recipient name set by admin";
+
+    return (
+      <section className="ea-page-section">
+        <button className="ea-text-button" onClick={() => setPage("Explore")}>
+          ← Back to trips
+        </button>
+
+        <div className="ea-trip-detail">
+          {(trip.cover_url || trip.poster_url) && (
+            <img
+              className="ea-trip-cover"
+              src={trip.cover_url || trip.poster_url}
+              alt={trip.title}
+            />
+          )}
+
+          <div className="ea-trip-detail-body">
+            {trip.tag && <span className="ea-tag">{trip.tag}</span>}
+            <h1>{trip.title}</h1>
+            <p className="ea-destination">⌖ {trip.destination}</p>
+            <h2 className="ea-trip-price">{formatPrice(trip.price)}</h2>
+
+            <div className="ea-detail-grid">
+              <Detail label="Date" value={trip.trip_date || "To be announced"} />
+              <Detail
+                label="Meeting point"
+                value={trip.meeting_point || "To be announced"}
+              />
+              <Detail
+                label="Meeting time"
+                value={trip.meeting_time || "To be announced"}
+              />
+            </div>
+
+            <h3>About this trip</h3>
+            <p>{trip.description || "More details coming
+              soon."}</p>
+
+            <h3>Activities</h3>
+            <p>{trip.activities || "Activities will be announced."}</p>
+
+            {trip.poster_url && (
+              <a
+                className="ea-button ea-button-outline"
+                href={trip.poster_url}
+                target="_blank"
+                rel="noopener noreferrer"
               >
-                Book
+                View trip poster
+              </a>
+            )}
+
+            <button
+              className="ea-button ea-button-primary ea-full-width"
+              onClick={() => setPage(user ? "Bookings" : "Login")}
+            >
+              Book this trip
+            </button>
+
+            <h3>Payment instructions</h3>
+            <PaymentInstructions
+              trip={trip}
+              paymentName={paymentName}
+            />
+
+            <form className="ea-form" onSubmit={submitBooking}>
+              <h3>Booking request</h3>
+              <label>
+                Full name
+                <input
+                  required
+                  value={bookingForm.full_name}
+                  onChange={(e) =>
+                    setBookingForm({
+                      ...bookingForm,
+                      full_name: e.target.value
+                    })
+                  }
+                  placeholder="Enter your full name"
+                />
+              </label>
+              <label>
+                Phone number
+                <input
+                  required
+                  value={bookingForm.phone}
+                  onChange={(e) =>
+                    setBookingForm({
+                      ...bookingForm,
+                      phone: e.target.value
+                    })
+                  }
+                  placeholder="07XX XXX XXX"
+                />
+              </label>
+              <label>
+                Number of seats
+                <input
+                  type="number"
+                  min="1"
+                  max="20"
+                  required
+                  value={bookingForm.seats}
+                  onChange={(e) =>
+                    setBookingForm({
+                      ...bookingForm,
+                      seats: e.target.value
+                    })
+                  }
+                />
+              </label>
+              <button className="ea-button ea-button-primary" type="submit">
+                Submit booking
+              </button>
+            </form>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  function renderBookings() {
+    return (
+      <section className="ea-page-section">
+        <SectionTitle eyebrow="YOUR ADVENTURES" title="My bookings" />
+        {!user ? (
+          <AuthPrompt onClick={() => setPage("Login")} />
+        ) : (
+          <EmptyState
+            title="Your bookings"
+            message="Booking history will appear here once your bookings table is configured for member access."
+          />
+        )}
+      </section>
+    );
+  }
+
+  function renderGallery() {
+    return (
+      <section className="ea-page-section">
+        <SectionTitle eyebrow="MOMENTS THAT MATTER" title="Photo & video gallery" />
+        {user && (
+          <label className="ea-upload-button">
+            + Upload photo or video
+            <input
+              type="file"
+              accept="image/*,video/*"
+              onChange={publishGalleryFile}
+              hidden
+              />
+          </label>
+        )}
+
+        {gallery.length ? (
+          <div className="ea-gallery-grid">
+            {gallery.map((item) => (
+              <article className="ea-gallery-item" key={item.id}>
+                {item.media_type === "video" ? (
+                  <video src={item.media_url} controls preload="metadata" />
+                ) : (
+                  <img src={item.media_url} alt={item.title || "Gallery item"} />
+                )}
+                <div className="ea-gallery-actions">
+                  <span>{item.title || "Elite Adventures"}</span>
+                  <a
+                    href={item.media_url}
+                    download
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    Download ↧
+                  </a>
+                  {isAdmin && (
+                    <button onClick={() => deleteGalleryItem(item.id)}>
+                      Delete
+                    </button>
+                  )}
+                </div>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <EmptyState
+            title="Your next memory belongs here"
+            message="Gallery photos and videos will appear here after upload."
+          />
+        )}
+      </section>
+    );
+  }
+
+  function renderSocialPage() {
+    return (
+      <section className="ea-page-section">
+        <SectionTitle eyebrow="FOLLOW THE JOURNEY" title="Connect with Elite Adventures" />
+        <SocialLinks links={socialLinks} />
+        <p className="ea-muted">
+          Tap a coloured social icon to open the official page.
+        </p>
+      </section>
+    );
+    }
+
+  function renderAnonymousChat() {
+    return (
+      <section className="ea-page-section">
+        <div className="ea-iconic-banner">
+          <h1>ELITE ADVENTURES <sup>®️</sup></h1>
+          <span>CHATBOX</span>
+        </div>
+        <form className="ea-form" onSubmit={sendAnonymousMessage}>
+          <p>Your message is securely encrypted.</p>
+          <textarea
+            value={anonymousMessage}
+            onChange={(e) => setAnonymousMessage(e.target.value)}
+            minLength={2}
+            maxLength={2000}
+            required
+            placeholder="Write your anonymous message..."
+            rows={5}
+          />
+          <small>{anonymousMessage.length}/2000 characters</small>
+          <button className="ea-button ea-button-primary" type="submit">
+            Submit anonymously
+          </button>
+        </form>
+        <p className="ea-muted">
+          Only authorised admins should have access to anonymous submissions.
+        </p>
+      </section>
+    );
+  }
+
+  function renderLogin() {
+    return (
+      <section className="ea-auth-page">
+        <div className="ea-auth-card">
+          <div className="ea-brand-mark ea-auth-mark">EA</div>
+          <h1>Welcome back</h1>
+          <p>Sign in to explore amazing adventures and connect with fellow travellers.</p>
+
+          <form className="ea-form" onSubmit={authMode === "login" ? signIn : signUp}>
+            <label>
+              Email address
+              <input
+                type="email"
+                required
+                autoComplete="email"
+                value={authForm.email}
+                onChange={(e) =>
+                  setAuthForm({ ...authForm, email: e.target.value })
+                  }
+                placeholder="you@example.com"
+              />
+            </label>
+
+            <label>
+              Password
+              <input
+                type="password"
+                required
+                minLength={6}
+                autoComplete={
+                  authMode === "login" ? "current-password" : "new-password"
+                }
+                value={authForm.password}
+                onChange={(e) =>
+                  setAuthForm({ ...authForm, password: e.target.value })
+                }
+                placeholder="Enter password"
+              />
+            </label>
+
+            <button className="ea-button ea-button-primary" type="submit">
+              {authMode === "login" ? "Log in" : "Create account"}
+            </button>
+          </form>
+
+          <button
+            className="ea-button ea-button-outline ea-full-width"
+            onClick={signInWithGoogle}
+          >
+            Continue with Google
+          </button>
+
+          <div className="ea-divider"><span>OR PHONE</span></div>
+
+          <form className="ea-form" onSubmit={requestPhoneLogin}>
+            <input
+              type="tel"
+              value={authForm.phone}
+              onChange={(e) =>
+                setAuthForm({ ...authForm, phone: e.target.value })
+              }
+              placeholder="+2547XXXXXXXX"
+            />
+            <button className="ea-button ea-button-outline" type="submit">
+              Request SMS verification
+            </button>
+          </form>
+
+          <button
+            className="ea-text-button"
+            onClick={() =>
+              setAuthMode(authMode === "login" ? "signup" : "login")
+            }
+          >
+            {authMode === "login"
+              ? "Don't have an account? Sign up"
+              : "Already registered? Log in"}
+          </button>
+        </div>
+      </section>
+    );
+  }
+
+  function renderAdmin() {
+    if (!user) return <AuthPrompt onClick={() => setPage("Login")} />;
+
+    if (!isAdmin) {
+      return (
+        <EmptyState
+          title="Admin access only"
+          message="Sign in using an account that has been assigned the admin role in Supabase."
+        />
+      );
+    }
+
+    return (
+      <section className="ea-page-section">
+        <SectionTitle eyebrow="MANAGEMENT" title="Admin dashboard" />
+        <div className="ea-admin-stats">
+          <Stat label="Trips" value={trips.length} />
+          <Stat label="Announcements" value={announcements.length} />
+          <Stat label="Gallery items" value={gallery.length} />
+          <Stat label="Bookings" value={bookings.length} />
+        </div>
+
+        <div className="ea-admin-panel">
+          <h2>{editingTrip ? "Edit trip" : "Create trip"}</h2>
+          <form className="ea-form" onSubmit={saveTrip}>
+            <label>
+              Trip name
+              <input
+                required
+                value={tripForm.title}
+                onChange={(e) =>
+                  setTripForm({ ...tripForm, title: e.target.value })
+                }
+                placeholder="e.g. Mount Kenya Expedition"
+              />
+            </label>
+
+            <label>
+              Destination
+              <input
+                required
+                value={tripForm.destination}
+                onChange={(e) =>
+                  setTripForm({ ...tripForm, destination: e.target.value })
+                }
+                placeholder="Destination name"
+              />
+            </label>
+
+            <label>
+              Trip date
+              <input
+                type="date"
+                value={tripForm.trip_date || ""}
+                onChange={(e) =>
+                  setTripForm({ ...tripForm, trip_date: e.target.value })
+                }
+              />
+            </label>
+
+            <label>
+              Fare (KSh)
+              <input
+                type="number"
+                min="0"
+                required
+                value={tripForm.price}
+                onChange={(e) =>
+                  setTripForm({ ...tripForm, price: e.target.value })
+                }
+                placeholder="1800"
+              />
+            </label>
+
+            <label>
+              Meeting point
+              <input
+                value={tripForm.meeting_point}
+                onChange={(e) =>
+                  setTripForm({ ...tripForm, meeting_point: e.target.value })
+                }
+                placeholder="Meeting location"
+              />
+            </label>
+
+            <label>
+              Meeting time
+              <input
+                type="text"
+                value={tripForm.meeting_time}
+                onChange={(e) =>
+                  setTripForm({ ...tripForm, meeting_time: e.target.value })
+                  }
+                placeholder="e.g. 5:30 AM"
+              />
+            </label>
+
+            <label>
+              Trip tag
+              <select
+                value={tripForm.tag}
+                onChange={(e) =>
+                  setTripForm({ ...tripForm, tag: e.target.value })
+                }
+              >
+                {TRIP_TAGS.map((tag) => (
+                  <option key={tag}>{tag}</option>
+                ))}
+              </select>
+            </label>
+
+            <label>
+              Activities
+              <textarea
+                value={tripForm.activities}
+                onChange={(e) =>
+                  setTripForm({ ...tripForm, activities: e.target.value })
+                }
+                placeholder="Hiking, swimming, photography..."
+              />
+            </label>
+
+            <label>
+              Description
+              <textarea
+                value={tripForm.description}
+                onChange={(e) =>
+                  setTripForm({ ...tripForm, description: e.target.value })
+                }
+                placeholder="Describe the experience..."
+              />
+            </label>
+
+            <label>
+              Upload trip poster
+              <input
+                type="file"
+                accept="image/*"
+                onChange={(e) => handleTripImage(e, "poster_url")}
+              />
+            </label>
+            {tripForm.poster_url && (
+              <img
+                className="ea-admin-preview"
+                src={tripForm.poster_url}
+                alt="Trip poster preview"
+              />
+        )}
+
+            <label>
+              Upload destination cover photo
+              <input
+                type="file"
+                accept="image/*"
+                onChange={(e) => handleTripImage(e, "cover_url")}
+              />
+            </label>
+            {tripForm.cover_url && (
+              <img
+                className="ea-admin-preview"
+                src={tripForm.cover_url}
+                alt="Destination cover preview"
+              />
+            )}
+
+            <h3>Payment settings</h3>
+
+            <label>
+              Payment method
+              <select
+                value={tripForm.payment_method}
+                onChange={(e) =>
+                  setTripForm({
+                    ...tripForm,
+                    payment_method: e.target.value
+                  })
+                }
+              >
+                {PAYMENT_METHODS.map((method) => (
+                  <option key={method.value} value={method.value}>
+                    {method.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label>
+              Recipient / business name
+              <input
+                value={tripForm.payment_name}
+                onChange={(e) =>
+                  setTripForm({ ...tripForm, payment_name: e.target.value })
+                }
+                placeholder="Name displayed to the customer"
+              />
+            </label>
+
+            {tripForm.payment_method === "till" && (
+              <label>
+                Till number
+                <input
+                  value={tripForm.till_number}
+                  onChange={(e) =>
+            setTripForm({ ...tripForm, till_number: e.target.value })
+                  }
+                  placeholder="Enter Till number"
+                />
+              </label>
+            )}
+
+            {tripForm.payment_method === "paybill" && (
+              <>
+                <label>
+                  Paybill number
+                  <input
+                    value={tripForm.paybill_number}
+                    onChange={(e) =>
+                      setTripForm({
+                        ...tripForm,
+                        paybill_number: e.target.value
+                      })
+                    }
+                    placeholder="Enter Paybill number"
+                  />
+                </label>
+                <label>
+                  Account number
+                  <input
+                    value={tripForm.account_number}
+                    onChange={(e) =>
+                      setTripForm({
+                        ...tripForm,
+                        account_number: e.target.value
+                      })
+                    }
+                    placeholder="Enter account number"
+                  />
+                </label>
+              </>
+            )}
+
+            {tripForm.payment_method === "pochi" && (
+              <label>
+                Pochi phone number
+                <input
+                  value={tripForm.pochi_number}
+                  onChange={(e) =>
+                    setTripForm({
+                      ...tripForm,
+                      pochi_number: e.target.value
+                    })
+                  }
+                  placeholder="Enter registered phone number"
+                />
+              </label>
+            )}
+
+            <label>
+              Customer payment instructions
+              <textarea
+                value={tripForm.payment_instructions}
+                onChange={(e) =>
+                  setTripForm({
+                    ...tripForm,
+                    payment_instructions: e.target.value
+                  })
+                }
+                placeholder="Explain the exact steps for this payment method."
+              />
+            </label>
+
+            <button className="ea-button ea-button-primary" type="submit">
+              {editingTrip ? "Update trip" : "Publish trip"}
+            </button>
+
+            {editingTrip && (
+              <button
+                type="button"
+                className="ea-button ea-button-outline"
+                onClick={() => {
+                  setEditingTrip(null);
+                  setTripForm(emptyTrip);
+                }}
+              >
+                Cancel editing
+              </button>
+            )}
+          </form>
+        </div>
+
+        <div className="ea-admin-panel">
+          <h2>Manage trips</h2>
+          {trips.map((trip) => (
+            <div className="ea-admin-row" key={trip.id}>
+              <div>
+                <strong>{trip.title}</strong>
+                <p>{trip.destination}</p>
+              </div>
+              <button
+                className="ea-small-button"
+                onClick={() => editTrip(trip)}
+              >
+                Edit
+              </button>
+              <button
+                className="ea-small-button danger"
+                onClick={() => deleteTrip(trip.id)}
+              >
+                Delete
               </button>
             </div>
-          </div>
-        </article>
-      ))}
-    </div>
-  );
-}
+          ))}
+        </div>
 
-function GalleryGrid({ gallery }) {
-  if (!gallery.length) {
-    return <p className="empty-state">Your adventure photos will appear here.</p>;
+        <div className="ea-admin-panel">
+          <h2>Publish announcement</h2>
+          <form className="ea-form" onSubmit={saveAnnouncement}>
+            <input
+              required
+              value={announcementForm.title}
+              onChange={(e) =>
+                setAnnouncementForm({
+                  ...announcementForm,
+                  title: e.target.value
+                })
+              }
+              placeholder="Announcement title"
+            />
+            <textarea
+              required
+              value={announcementForm.content}
+              onChange={(e) =>
+                setAnnouncementForm({
+                  ...announcementForm,
+                  content: e.target.value
+                })
+              }
+              placeholder="Write announcement..."
+            />
+            <input
+              value={announcementForm.image_url}
+              onChange={(e) =>
+                setAnnouncementForm({
+                  ...announcementForm,
+                  image_url: e.target.value
+                })
+              }
+              placeholder="Optional image URL"
+            />
+            <button className="ea-button ea-button-primary" type="submit">
+              Publish announcement
+            </button>
+          </form>
+
+          {announcements.map((item) => (
+            <div className="ea-admin-row" key={item.id}>
+              <strong>{item.title}</strong>
+              <button
+                className="ea-small-button danger"
+                onClick={() => deleteAnnouncement(item.id)}
+              >
+                Delete
+              </button>
+            </div>
+          ))}
+        </div>
+
+        <div className="ea-admin-panel">
+          <h2>Edit social links</h2>
+          <form className="ea-form" onSubmit={saveSocialLinks}>
+            {SOCIALS.map((social) => (
+              <label key={social.key}>
+                {social.name} URL
+                <input
+                  type="url"
+                  required
+                  value={socialForm[social.key]}
+                  onChange={(e) =>
+                    setSocialForm({
+                      ...socialForm,
+                      [social.key]: e.target.value
+                    })
+                  }
+                />
+              </label>
+            ))}
+            <button className="ea-button ea-button-primary" type="submit">
+              Save social links
+            </button>
+          </form>
+        </div>
+
+        <div className="ea-admin-panel">
+          <h2>Anonymous messages</h2>
+          {messages.length ? (
+            messages.map((item) => (
+              <article className="ea-anonymous-item" key={item.id}>
+                <p>{item.message}</p>
+                <button
+                  className="ea-small-button"
+                  onClick={() => {
+                    const shareText = encodeURIComponent(item.message);
+                    window.open(
+                      `https://wa.me/?text=${shareText}`,
+                      "_blank",
+                      "noopener,noreferrer"
+                    );
+                  }}
+                >
+                  Share
+                </button>
+              </article>
+            ))
+          ) : (
+            <p className="ea-muted">No anonymous messages to display.</p>
+          )}
+        </div>
+      </section>
+    );
+  }
+
+  function renderSettings() {
+    return (
+      <section className="ea-page-section">
+        <SectionTitle eyebrow="MAKE IT YOURS" title="Settings" />
+        <div className="ea-admin-panel">
+          <label>
+            Font size
+            <select
+              value={settings.fontSize}
+              onChange={(e) =>
+                setSettings({ ...settings, fontSize: e.target.value })
+              }
+            >
+              <option value="12">Small</option>
+              <option value="14">Medium</option>
+              <option value="16">Large</option>
+              <option value="18">Extra large</option>
+            </select>
+          </label>
+
+          <label>
+            Font style
+            <select
+              value={settings.fontFamily}
+              onChange={(e) =>
+                setSettings({ ...settings, fontFamily: e.target.value })
+              }
+            >
+              <option value="system">System default</option>
+              <option value="serif">Serif</option>
+              <option value="monospace">Monospace</option>
+            </select>
+          </label>
+
+          <label>
+            Appearance
+            <select
+              value={settings.theme}
+              onChange={(e) =>
+                setSettings({ ...settings, theme: e.target.value })
+              }
+            >
+              <option value="dark">Dark</option>
+              <option value="light">Light</option>
+            </select>
+          </label>
+
+          <p className="ea-muted">
+            These settings apply while this page is open.
+          </p>
+        </div>
+      </section>
+    );
+  }
+
+  function renderAbout() {
+    return (
+      <section className="ea-page-section ea-about">
+        <span className="ea-brand-mark">EA</span>
+        <h1>ELITE ADVENTURES</h1>
+        <em>{SLOGAN}</em>
+        <p>
+          Elite Adventures brings people together through travel, outdoor
+          experiences, new destinations and shared memories. Discover new  places, meet fellow travellers and make every journey count.
+        </p>
+        <h2>Our mission</h2>
+        <p>
+          To connect people with remarkable experiences and create welcoming,
+          memorable adventures for everyone.
+        </p>
+        <SocialLinks links={socialLinks} />
+      </section>
+    );
+  }
+
+  function renderProfile() {
+    return (
+      <section className="ea-page-section">
+        <SectionTitle eyebrow="YOUR ACCOUNT" title="My profile" />
+        {user ? (
+          <div className="ea-admin-panel">
+            <div className="ea-avatar">
+              {(user.email || user.phone || "M").charAt(0).toUpperCase()}
+            </div>
+            <h2>{user.user_metadata?.full_name || "Elite Member"}</h2>
+            <p>{user.email || user.phone}</p>
+            <p className="ea-muted">{isAdmin ? "Administrator" : "Member"}</p>
+            <button className="ea-button ea-button-outline" onClick={signOut}>
+              Log out
+            </button>
+          </div>
+        ) : (
+          <AuthPrompt onClick={() => setPage("Login")} />
+        )}
+      </section>
+    );
+  }
+
+  function renderPage() {
+    switch (page) {
+      case "Home":
+        return renderHome();
+      case "Explore":
+        return renderExplore();
+      case "Trip Details":
+        return renderTripDetails();
+      case "Bookings":
+        return renderBookings();
+      case "Gallery":
+        return renderGallery();
+      case "Social Links":
+        return renderSocialPage();
+      case "Anonymous Chat":
+        return renderAnonymousChat();
+      case "Login":
+        return renderLogin();
+      case "Admin":
+        return renderAdmin();
+      case "Settings":
+        return renderSettings();
+      case "About":
+        return renderAbout();
+      case "Profile":
+        return renderProfile();
+      case "Menu":
+        return renderMenu();
+      case "Announcements":
+        return (
+          <section className="ea-page-section">
+            <SectionTitle title="Announcements" />
+            {announcements.map((item) => (
+              <article className="ea-announcement" key={item.id}>
+                <h3>{item.title}</h3>
+                <p>{item.content}</p>
+              </article>
+            ))}
+          </section>
+        );
+      case "Group Chat":
+      case "Private Chat":
+      case "Chat Admin":
+        return (
+          <section className="ea-page-section">
+            <SectionTitle title={page} />
+            <EmptyState
+              title="Chat setup required"
+              message="Real-time group, private and admin chat require chat tables, access policies and realtime configuration in Supabase."
+            />
+          </section>
+        );
+      default:
+        return renderHome();
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="ea-loading">
+        <span className="ea-brand-mark">EA</span>
+        <h2>ELITE ADVENTURES</h2>
+        <em>{SLOGAN}</em>
+        <div className="ea-loading-bar" />
+      </div>
+    );
   }
 
   return (
-    <div className="gallery-grid">
-      {gallery.map((item) => (
-        <a
-          className="gallery-item"
-          href={item.image_url}
-          target="_blank"
-          rel="noreferrer"
-          key={item.id}
-        >
-          <img src={item.image_url} alt="Elite Adventures moment" loading="lazy" />
-        </a>
-      ))}
+    <div
+      className={`ea-app theme-${settings.theme}`}
+      style={{
+        "--ea-font-size": `${settings.fontSize}px`,
+        "--ea-font-family":
+          settings.fontFamily === "system"
+            ? "system-ui, sans-serif"
+            : settings.fontFamily
+      }}
+    >
+      {renderHeader()}
+
+      {notice && (
+        <div className="ea-notice" role="status">
+          <span>{notice}</span>
+          <button onClick={() => setNotice("")} aria-label="Dismiss">
+            ×
+          </button>
+        </div>
+      )}
+
+      <main className="ea-main">{renderPage()}</main>
+      <footer className="ea-footer">
+        <strong>ELITE ADVENTURES ®️</strong>
+        <em>{SLOGAN}</em>
+        <SocialLinks links={socialLinks} />
+        <small>Explore. Connect. Travel Together.</small>
+      </footer>
+
+      {renderNavigation()}
     </div>
   );
 }
 
-function SocialLinks({ socials }) {
-  const platforms = [
-    ["facebook", "f", "Facebook"],
-    ["tiktok", "♪", "TikTok"],
-    ["instagram", "◎", "Instagram"],
-    ["x", "𝕏", "X"],
-    ["youtube", "▶", "YouTube"]
-  ];
+function TripCard({ trip, onOpen }) {
+  return (
+    <article className="ea-trip-card">
+      <button className="ea-trip-image-button" onClick={onOpen}>
+        {trip.cover_url || trip.poster_url ? (
+          <img
+            src={trip.cover_url || trip.poster_url}
+            alt={trip.title}
+            loading="lazy"
+          />
+        ) : (
+          <div className="ea-trip-placeholder">✦</div>
+        )}
+        {trip.tag && <span className="ea-tag">{trip.tag}</span>}
+      </button>
+
+      <div className="ea-trip-card-body">
+        <h3>{trip.title}</h3>
+        <p className="ea-destination">⌖ {trip.destination}</p>
+        <p className="ea-trip-date">
+          ◷ {trip.trip_date || "Date to be announced"}
+        </p>
+        <div className="ea-trip-card-bottom">
+          <strong>{formatPrice(trip.price)}</strong>
+          <button className="ea-small-button" onClick={onOpen}>
+            View details
+          </button>
+        </div>
+      </div>
+    </article>
+  );
+}
+
+function PaymentInstructions({ trip, paymentName }) {
+  let steps = [];
+
+  if (trip.payment_method === "paybill") {
+    steps = [
+      "Open M-PESA on your phone.",
+      "Choose Lipa na M-PESA, then Pay Bill.",
+      `Enter Paybill number: ${trip.paybill_number || "To be provided"}.`,
+      `Enter account number: ${trip.account_number || "To be provided"}.`,
+      `Enter the trip amount and confirm the recipient: ${paymentName}.`
+    ];
+  } else if (trip.payment_method === "pochi") {
+    steps = [
+      "Open M-PESA on your phone.",
+      "Choose Pochi la Biashara.",
+      `Use the registered business number: ${trip.pochi_number || "To be provided"}.`,
+      `Confirm the recipient name: ${paymentName}, then enter the amount.`
+    ];
+  } else {
+    steps = [
+      "Open M-PESA on your phone.",
+      "Choose Lipa na M-PESA, then Buy Goods and Services.",
+      `Enter Till number: ${trip.till_number || "To be provided"}.`,
+      `Confirm the business name: ${paymentName}, then enter the amount.`
+    ];
+  }
 
   return (
-    <div className="social-links">
-      {platforms.map(([key, symbol, label]) =>
-        socials[key] ? (
-          <a
-            key={key}
-            href={socials[key]}
-            target="_blank"
-            rel="noreferrer"
-            aria-label={label}
-            title={label}
-          >
-            {symbol}
-          </a>
-        ) : null
-      )}
+    <div className="ea-payment-instructions">
+      <strong>
+        <ol>
+        {steps.map((step, index) => (
+          <li key={index}>{step}</li>
+        ))}
+      </ol>
+      {trip.payment_instructions && <p>{trip.payment_instructions}</p>}
+      <p className="ea-muted">
+        Verify the recipient and amount before confirming payment.
+      </p>
     </div>
   );
-                                                         }
-        
+}
+
+function FeatureCard({ icon, title, text, onClick }) {
+  return (
+    <button className="ea-feature-card" onClick={onClick}>
+      <span>{icon}</span>
+      <strong>{title}</strong>
+      <small>{text}</small>
+      <b>→</b>
+    </button>
+  );
+}
+
+function Detail({ label, value }) {
+  return (
+    <div className="ea-detail-item">
+      <small>{label}</small>
+      <strong>{value}</strong>
+    </div>
+  );
+}
+
+function Stat({ label, value }) {
+  return (
+    <div className="ea-stat">
+      <strong>{value}</strong>
+      <span>{label}</span>
+    </div>
+  );
+}
+
+function AuthPrompt({ onClick }) {
+  return (
+    <div className="ea-empty">
+      <span>♙</span>
+      <h3>Sign in to continue</h3>
+      <p>Access your Elite Adventures account.</p>
+      <button className="ea-button ea-button-primary" onClick={onClick}>
+        Sign in
+      </button>
+    </div>
+  );
+      }
