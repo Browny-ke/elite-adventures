@@ -852,8 +852,7 @@ export default function App() {
             </div>
 
             <h3>About this trip</h3>
-            <p>{trip.description || "More details coming
-              soon."}</p>
+            <p>{trip.description || "More details coming soon."}</p>
 
             <h3>Activities</h3>
             <p>{trip.activities || "Activities will be announced."}</p>
