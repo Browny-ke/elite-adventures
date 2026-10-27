@@ -1,14 +1,7 @@
+
 import React, { useEffect, useState } from "react";
-import { createClient } from "@supabase/supabase-js";
+import { supabase } from "./supabase.js";
 import "./App.css";
-
-const SUPABASE_URL = https://pokruqaprrzqkpllzrny.supabase.co;
-const SUPABASE_ANON_KEY = sb_publishable_NaOujt2XAQYcwvlxgfQWWQ_PijCNOl3;
-
-const supabase = createClient(
-  SUPABASE_URL,
-  SUPABASE_ANON_KEY
-);
 
 const DEFAULT_SOCIALS = {
   facebook: "https://www.facebook.com/profile.php?id=61595176810539",
