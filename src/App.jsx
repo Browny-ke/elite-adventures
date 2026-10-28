@@ -12,6 +12,8 @@ import {
   CircleHelp, Sparkles, Ticket, Wallet, Check, X
 } from "lucide-react";
 import "./App.css";
+import logo from "../assets/elite-adventures-logo.png";
+import cover from "../assets/elite-adventures-cover.jpg";
 
 const BRAND = "ELITE ADVENTURES";
 const SLOGAN = "Adventure Beyond Limits";
