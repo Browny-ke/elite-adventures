@@ -11,7 +11,7 @@ import {
   Mail, Lock, Eye, EyeOff, Upload, Globe, MessageSquare,
   CircleHelp, Sparkles, Ticket, Wallet, Check, X
 } from "lucide-react";
-import "./app.css";
+import "./App.css";
 
 const BRAND = "ELITE ADVENTURES";
 const SLOGAN = "Adventure Beyond Limits";
